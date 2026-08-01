@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>The Triangle Peg Game</title>
+<style>
+  :root{
+    --table:#2b1d14;
+    --table-2:#20150e;
+    --brass:#e8c977;
+    --ink:#f3e7d3;
+    --ink-dim:#c9b393;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{touch-action:manipulation}
+  body{
+    font-family:Georgia,'Times New Roman',serif;
+    background:radial-gradient(1200px 700px at 50% -10%, #3a2a1c 0%, var(--table) 55%, var(--table-2) 100%);
+    color:var(--ink);
+    display:flex;flex-direction:column;align-items:center;
+    min-height:100vh;
+    min-height:100svh;
+    padding:24px 16px 40px;
+    padding-left:max(16px, env(safe-area-inset-left));
+    padding-right:max(16px, env(safe-area-inset-right));
+    padding-bottom:max(40px, env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color:transparent;
+    -webkit-touch-callout:none;
+    -webkit-user-select:none;
+    user-select:none;
+    touch-action:manipulation;
+  }
+  header{text-align:center;margin-bottom:10px}
+  h1{
+    font-size:clamp(1.6rem,4vw,2.4rem);
+    letter-spacing:.06em;color:var(--brass);
+    text-shadow:0 2px 0 rgba(0,0,0,.5);font-variant:small-caps;
+  }
+  .sub{color:var(--ink-dim);font-style:italic;margin-top:4px;font-size:.95rem}
+  .status{margin:10px 0 6px;min-height:1.6em;font-size:1.05rem;text-align:center}
+  .status b{color:var(--brass)}
+  .noscript-warn{
+    margin:10px 0;padding:10px 16px;border:1px solid var(--brass);border-radius:8px;
+    color:var(--brass);text-align:center;max-width:420px;font-size:.95rem;
+  }
+  .boardwrap{
+    width:min(92vw,520px);
+    filter:drop-shadow(0 18px 24px rgba(0,0,0,.55));
+  }
+  #board{
+    display:block;
+    width:100%;
+    height:auto;
+    aspect-ratio:520/490;
+  }
+  .hole-hit{cursor:pointer}
+  .controls{display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;justify-content:center}
+  button{
+    font-family:inherit;font-size:1rem;letter-spacing:.04em;
+    background:linear-gradient(#8a5a2e,#6e4522);
+    color:var(--ink);border:1px solid #52351a;border-radius:8px;
+    padding:12px 20px;min-height:44px;cursor:pointer;
+    box-shadow:0 3px 0 #3d2712, 0 6px 10px rgba(0,0,0,.4);
+    touch-action:manipulation;
+  }
+  @media (hover:hover){
+    button:hover{filter:brightness(1.12)}
+  }
+  button:active{transform:translateY(2px);box-shadow:0 1px 0 #3d2712}
+  button:disabled{opacity:.45;cursor:default;transform:none}
+  .plaque{
+    margin-top:22px;max-width:460px;text-align:center;
+    background:linear-gradient(#a06f3e,#7d5228);
+    border:2px solid #52351a;border-radius:10px;
+    padding:12px 18px;color:#2b1a0c;
+    box-shadow:inset 0 2px 4px rgba(255,255,255,.25), 0 6px 12px rgba(0,0,0,.4);
+    font-size:.9rem;line-height:1.5;
+  }
+  .plaque b{font-variant:small-caps;letter-spacing:.05em}
+  .overlay{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(15,9,5,.75);z-index:10;padding:20px;
+  }
+  .overlay.show{display:flex}
+  .card{
+    background:linear-gradient(#b07a45,#8a5a2e);
+    border:3px solid #52351a;border-radius:14px;
+    padding:28px 32px;text-align:center;color:#241407;
+    max-width:380px;box-shadow:0 20px 40px rgba(0,0,0,.6);
+  }
+  .card h2{font-variant:small-caps;letter-spacing:.06em;margin-bottom:8px;font-size:1.5rem}
+  .card p{margin-bottom:16px;font-size:1.05rem}
+  .peg-count{font-size:2.6rem;font-weight:bold;display:block;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>The Triangle Peg Game</h1>
+  <div class="sub">Jump a tee over its neighbor into an empty hole. Leave as few as you can.</div>
+</header>
+
+<noscript>
+  <div class="noscript-warn">This preview can show the board but not run the game.
+  Open the file in <b>Safari</b> to play: long-press it, tap Share, then Safari.</div>
+</noscript>
+
+<div class="status" id="status">Pick a hole to leave <b>empty</b> to start.</div>
+<div class="noscript-warn" id="jscheck">&#9888;&#65039; If this yellow box stays visible, JavaScript is not running in this viewer &mdash; taps cannot work. In iPhone Settings &rarr; Apps &rarr; Safari &rarr; Advanced, make sure JavaScript is ON, then reload.</div>
+<div class="status" id="cheatline" style="color:#ffd76a;font-size:.95rem"></div>
+
+<div class="boardwrap">
+  <svg id="board" viewBox="0 0 520 490" width="520" height="490" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="woodgrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#c08a52"/>
+        <stop offset=".5" stop-color="#9c6a38"/>
+        <stop offset="1" stop-color="#7a4f26"/>
+      </linearGradient>
+      <radialGradient id="holegrad" cx=".5" cy=".4" r=".8">
+        <stop offset="0" stop-color="#1f1207"/>
+        <stop offset="1" stop-color="#3a2412"/>
+      </radialGradient>
+      <marker id="arrowhead" markerWidth="12" markerHeight="10" refX="10" refY="5"
+              orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0,0 L12,5 L0,10 Z" fill="#ffd76a"/>
+      </marker>
+    </defs>
+
+    <path d="M260 24 L502 462 L18 462 Z" fill="url(#woodgrad)" stroke="#52351a"
+          stroke-width="6" stroke-linejoin="round"/>
+    <path d="M260 52 L478 450 L42 450 Z" fill="none" stroke="rgba(0,0,0,.18)" stroke-width="2"/>
+    <g fill="none" stroke="rgba(60,35,12,.25)" stroke-width="2">
+      <path d="M80 440 C 180 430, 340 435, 450 442"/>
+      <path d="M120 390 C 220 382, 320 386, 410 392"/>
+      <path d="M160 330 C 230 324, 300 326, 370 332"/>
+      <path d="M190 270 C 240 265, 290 267, 335 272"/>
+      <path d="M220 210 C 250 206, 280 207, 305 211"/>
+    </g>
+
+    <g id="holesg">
+      <g class="hole-hit" data-idx="0">
+        <circle cx="260" cy="100" r="32" fill="transparent"/>
+        <circle cx="260" cy="100" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="256" cy="95" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="1">
+        <circle cx="216" cy="182" r="32" fill="transparent"/>
+        <circle cx="216" cy="182" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="212" cy="177" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="2">
+        <circle cx="304" cy="182" r="32" fill="transparent"/>
+        <circle cx="304" cy="182" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="300" cy="177" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="3">
+        <circle cx="172" cy="264" r="32" fill="transparent"/>
+        <circle cx="172" cy="264" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="168" cy="259" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="4">
+        <circle cx="260" cy="264" r="32" fill="transparent"/>
+        <circle cx="260" cy="264" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="256" cy="259" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="5">
+        <circle cx="348" cy="264" r="32" fill="transparent"/>
+        <circle cx="348" cy="264" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="344" cy="259" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="6">
+        <circle cx="128" cy="346" r="32" fill="transparent"/>
+        <circle cx="128" cy="346" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="124" cy="341" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="7">
+        <circle cx="216" cy="346" r="32" fill="transparent"/>
+        <circle cx="216" cy="346" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="212" cy="341" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="8">
+        <circle cx="304" cy="346" r="32" fill="transparent"/>
+        <circle cx="304" cy="346" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="300" cy="341" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="9">
+        <circle cx="392" cy="346" r="32" fill="transparent"/>
+        <circle cx="392" cy="346" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="388" cy="341" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="10">
+        <circle cx="84" cy="428" r="32" fill="transparent"/>
+        <circle cx="84" cy="428" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="80" cy="423" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="11">
+        <circle cx="172" cy="428" r="32" fill="transparent"/>
+        <circle cx="172" cy="428" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="168" cy="423" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="12">
+        <circle cx="260" cy="428" r="32" fill="transparent"/>
+        <circle cx="260" cy="428" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="256" cy="423" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="13">
+        <circle cx="348" cy="428" r="32" fill="transparent"/>
+        <circle cx="348" cy="428" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="344" cy="423" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+      <g class="hole-hit" data-idx="14">
+        <circle cx="436" cy="428" r="32" fill="transparent"/>
+        <circle cx="436" cy="428" r="17" fill="url(#holegrad)" stroke="#52351a" stroke-width="2"/>
+        <circle cx="432" cy="423" r="4" fill="rgba(255,255,255,.07)"/>
+      </g>
+    </g>
+    <g id="pegsg">
+      <g class="hole-hit" id="peg-0" data-idx="0">
+        <ellipse cx="260" cy="118" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M247,66 Q260,60 273,66 L265,74 L264,112 Q260,118 256,112 L255,74 Z" fill="#e2b13c" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M247,66 Q260,60 273,66 L265,74 L255,74 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M256,76 L257,110 L259,110 L258.5,76 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-1" data-idx="1">
+        <ellipse cx="216" cy="200" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M203,148 Q216,142 229,148 L221,156 L220,194 Q216,200 212,194 L211,156 Z" fill="#c0392b" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M203,148 Q216,142 229,148 L221,156 L211,156 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M212,158 L213,192 L215,192 L214.5,158 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-2" data-idx="2">
+        <ellipse cx="304" cy="200" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M291,148 Q304,142 317,148 L309,156 L308,194 Q304,200 300,194 L299,156 Z" fill="#3b6fb0" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M291,148 Q304,142 317,148 L309,156 L299,156 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M300,158 L301,192 L303,192 L302.5,158 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-3" data-idx="3">
+        <ellipse cx="172" cy="282" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M159,230 Q172,224 185,230 L177,238 L176,276 Q172,282 168,276 L167,238 Z" fill="#e7e2d5" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M159,230 Q172,224 185,230 L177,238 L167,238 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M168,240 L169,274 L171,274 L170.5,240 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-4" data-idx="4">
+        <ellipse cx="260" cy="282" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M247,230 Q260,224 273,230 L265,238 L264,276 Q260,282 256,276 L255,238 Z" fill="#4a8f4a" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M247,230 Q260,224 273,230 L265,238 L255,238 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M256,240 L257,274 L259,274 L258.5,240 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-5" data-idx="5">
+        <ellipse cx="348" cy="282" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M335,230 Q348,224 361,230 L353,238 L352,276 Q348,282 344,276 L343,238 Z" fill="#e2b13c" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M335,230 Q348,224 361,230 L353,238 L343,238 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M344,240 L345,274 L347,274 L346.5,240 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-6" data-idx="6">
+        <ellipse cx="128" cy="364" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M115,312 Q128,306 141,312 L133,320 L132,358 Q128,364 124,358 L123,320 Z" fill="#c0392b" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M115,312 Q128,306 141,312 L133,320 L123,320 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M124,322 L125,356 L127,356 L126.5,322 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-7" data-idx="7">
+        <ellipse cx="216" cy="364" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M203,312 Q216,306 229,312 L221,320 L220,358 Q216,364 212,358 L211,320 Z" fill="#3b6fb0" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M203,312 Q216,306 229,312 L221,320 L211,320 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M212,322 L213,356 L215,356 L214.5,322 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-8" data-idx="8">
+        <ellipse cx="304" cy="364" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M291,312 Q304,306 317,312 L309,320 L308,358 Q304,364 300,358 L299,320 Z" fill="#e7e2d5" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M291,312 Q304,306 317,312 L309,320 L299,320 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M300,322 L301,356 L303,356 L302.5,322 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-9" data-idx="9">
+        <ellipse cx="392" cy="364" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M379,312 Q392,306 405,312 L397,320 L396,358 Q392,364 388,358 L387,320 Z" fill="#4a8f4a" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M379,312 Q392,306 405,312 L397,320 L387,320 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M388,322 L389,356 L391,356 L390.5,322 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-10" data-idx="10">
+        <ellipse cx="84" cy="446" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M71,394 Q84,388 97,394 L89,402 L88,440 Q84,446 80,440 L79,402 Z" fill="#e2b13c" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M71,394 Q84,388 97,394 L89,402 L79,402 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M80,404 L81,438 L83,438 L82.5,404 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-11" data-idx="11">
+        <ellipse cx="172" cy="446" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M159,394 Q172,388 185,394 L177,402 L176,440 Q172,446 168,440 L167,402 Z" fill="#c0392b" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M159,394 Q172,388 185,394 L177,402 L167,402 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M168,404 L169,438 L171,438 L170.5,404 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-12" data-idx="12">
+        <ellipse cx="260" cy="446" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M247,394 Q260,388 273,394 L265,402 L264,440 Q260,446 256,440 L255,402 Z" fill="#3b6fb0" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M247,394 Q260,388 273,394 L265,402 L255,402 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M256,404 L257,438 L259,438 L258.5,404 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-13" data-idx="13">
+        <ellipse cx="348" cy="446" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M335,394 Q348,388 361,394 L353,402 L352,440 Q348,446 344,440 L343,402 Z" fill="#e7e2d5" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M335,394 Q348,388 361,394 L353,402 L343,402 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M344,404 L345,438 L347,438 L346.5,404 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+      <g class="hole-hit" id="peg-14" data-idx="14">
+        <ellipse cx="436" cy="446" rx="15" ry="5" fill="rgba(0,0,0,.35)"/>
+        <path d="M423,394 Q436,388 449,394 L441,402 L440,440 Q436,446 432,440 L431,402 Z" fill="#4a8f4a" stroke="rgba(0,0,0,.35)" stroke-width="1.5"/>
+        <path d="M423,394 Q436,388 449,394 L441,402 L431,402 Z" fill="rgba(255,255,255,.25)"/>
+        <path d="M432,404 L433,438 L435,438 L434.5,404 Z" fill="rgba(255,255,255,.35)"/>
+      </g>
+    </g>
+    <g id="fx"></g>
+  </svg>
+</div>
+
+<div class="controls">
+  <button id="undoBtn" disabled>Undo</button>
+  <button id="resetBtn">Start over</button>
+  <button id="cheatBtn">Cheat: off</button>
+</div>
+
+<div class="plaque">
+  <b>How you rate:</b><br>
+  1 peg left &mdash; genius &nbsp;&bull;&nbsp; 2 &mdash; pretty smart<br>
+  3 &mdash; just plain dumb &nbsp;&bull;&nbsp; 4+ &mdash; eg-no-ra-moose
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="card">
+    <h2 id="endTitle">Game over</h2>
+    <span class="peg-count" id="endCount">3</span>
+    <p id="endMsg">pegs remaining</p>
+    <button id="againBtn">Play again</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  // first thing: prove JS is alive by hiding the warning banner
+  var jc = document.getElementById('jscheck');
+  if (jc) jc.style.display = 'none';
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var svg = document.getElementById('board');
+  var fx = document.getElementById('fx');
+  var statusEl = document.getElementById('status');
+  var cheatline = document.getElementById('cheatline');
+  var undoBtn = document.getElementById('undoBtn');
+  var overlay = document.getElementById('overlay');
+
+  function el(name, attrs, parent){
+    var n = document.createElementNS(NS, name);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+
+  var pos = [];
+  (function(){
+    var topY = 100, dy = 82, cx = 260, dx = 88, i = 0;
+    for (var r = 0; r < 5; r++){
+      for (var c = 0; c <= r; c++){
+        pos[i++] = { x: cx + (c - r/2) * dx, y: topY + r * dy };
+      }
+    }
+  })();
+
+  var LINES = [
+    [0,1,3],[0,2,5],[1,3,6],[1,4,8],[2,4,7],[2,5,9],
+    [3,6,10],[3,7,12],[4,7,11],[4,8,13],[5,8,12],[5,9,14],
+    [3,4,5],[6,7,8],[7,8,9],[10,11,12],[11,12,13],[12,13,14]
+  ];
+  var MOVES = [];
+  LINES.forEach(function(t){
+    MOVES.push([t[0],t[1],t[2]]);
+    MOVES.push([t[2],t[1],t[0]]);
+  });
+
+  var pegs, phase, selected, history;
+  var cheat = false;
+
+  var memo = {};
+  function popcount(s){ var n=0; while(s){ n += s & 1; s >>= 1; } return n; }
+  function stateKey(){
+    var k = 0;
+    for (var i=0;i<15;i++) if (pegs[i]) k |= (1<<i);
+    return k;
+  }
+  function solve(state){
+    if (memo[state] !== undefined) return memo[state];
+    var best = { left: popcount(state), move: null };
+    for (var mi=0; mi<MOVES.length; mi++){
+      var m = MOVES[mi];
+      if ((state>>m[0] & 1) && (state>>m[1] & 1) && !(state>>m[2] & 1)){
+        var ns = (state & ~(1<<m[0]) & ~(1<<m[1])) | (1<<m[2]);
+        var r = solve(ns);
+        if (r.left < best.left){
+          best = { left: r.left, move: m };
+          if (best.left === 1) break;
+        }
+      }
+    }
+    memo[state] = best;
+    return best;
+  }
+
+  function legalTargets(from){
+    var out = [];
+    MOVES.forEach(function(m){
+      if (m[0]===from && pegs[m[0]] && pegs[m[1]] && !pegs[m[2]]) out.push(m[2]);
+    });
+    return out;
+  }
+  function anyMoves(){
+    return MOVES.some(function(m){ return pegs[m[0]] && pegs[m[1]] && !pegs[m[2]]; });
+  }
+  function pegCount(){
+    var n = 0; for (var i=0;i<15;i++) if (pegs[i]) n++;
+    return n;
+  }
+  function setStatus(msg){ statusEl.innerHTML = msg; }
+
+  function render(){
+    for (var i=0;i<15;i++){
+      var pg = document.getElementById('peg-'+i);
+      pg.style.display = pegs[i] ? '' : 'none';
+    }
+    while (fx.firstChild) fx.removeChild(fx.firstChild);
+
+    if (phase==='play' && selected!==null){
+      var s = pos[selected];
+      el('circle', {cx:s.x, cy:s.y, r:26, fill:'none', stroke:'#ffd76a',
+                    'stroke-width':3.5, 'pointer-events':'none'}, fx);
+      legalTargets(selected).forEach(function(t){
+        var q = pos[t];
+        el('circle', {cx:q.x, cy:q.y, r:22, fill:'rgba(143,226,143,.18)',
+                      stroke:'#8fe28f', 'stroke-width':3, 'stroke-dasharray':'5 5',
+                      'pointer-events':'none'}, fx);
+      });
+    }
+    renderCheat();
+  }
+
+  function renderCheat(){
+    if (!cheat){ cheatline.innerHTML = ''; return; }
+    if (phase === 'choose'){
+      cheatline.innerHTML = 'Cheat: any starting hole can be beaten. A corner (like the top) is a classic choice.';
+      return;
+    }
+    if (phase !== 'play'){ cheatline.innerHTML = ''; return; }
+    var best = solve(stateKey());
+    if (!best.move){ cheatline.innerHTML = ''; return; }
+    var m = best.move;
+    var a = pos[m[0]], c = pos[m[2]];
+    var dx = c.x - a.x, dy = c.y - a.y, len = Math.sqrt(dx*dx + dy*dy);
+    var ux = dx/len, uy = dy/len;
+    el('line', {x1: a.x + ux*22, y1: a.y + uy*22,
+                x2: c.x - ux*26, y2: c.y - uy*26,
+                stroke:'#ffd76a', 'stroke-width':4, 'stroke-linecap':'round',
+                'marker-end':'url(#arrowhead)', 'pointer-events':'none',
+                opacity:.9}, fx);
+    el('circle', {cx: pos[m[1]].x, cy: pos[m[1]].y, r: 26, fill:'none',
+                  stroke:'#ff8c5a', 'stroke-width':2.5, 'stroke-dasharray':'4 4',
+                  'pointer-events':'none'}, fx);
+    if (best.left === 1){
+      cheatline.innerHTML = 'Cheat: jump ' + (m[0]+1) + ' over ' + (m[1]+1) + ' into ' + (m[2]+1) +
+                            ' &mdash; a 1-peg finish is still on the table.';
+    } else {
+      cheatline.innerHTML = 'Cheat: a 1-peg finish is gone (best now: ' + best.left +
+                            '). Undo, or follow the arrow for the best you can salvage.';
+    }
+  }
+
+  function init(){
+    pegs = []; for (var i=0;i<15;i++) pegs[i] = true;
+    phase = 'choose';
+    selected = null;
+    history = [];
+    undoBtn.disabled = true;
+    overlay.classList.remove('show');
+    setStatus('Pick a hole to leave <b>empty</b> to start.');
+    render();
+  }
+
+  function clickHole(i){
+    if (phase==='choose'){
+      pegs[i] = false;
+      phase = 'play';
+      setStatus('Select a tee, then a highlighted hole to jump.');
+      render();
+      return;
+    }
+    if (phase!=='play') return;
+
+    if (selected===null){
+      if (pegs[i]){
+        if (legalTargets(i).length===0){
+          setStatus('That tee has no jumps. Pick another.');
+          return;
+        }
+        selected = i; render();
+      }
+      return;
+    }
+
+    if (i===selected){ selected = null; render(); return; }
+
+    var mv = null;
+    MOVES.forEach(function(m){
+      if (m[0]===selected && m[2]===i && pegs[m[0]] && pegs[m[1]] && !pegs[m[2]]) mv = m;
+    });
+
+    if (mv){
+      history.push(pegs.slice());
+      pegs[mv[0]] = false;
+      pegs[mv[1]] = false;
+      pegs[mv[2]] = true;
+      selected = null;
+      undoBtn.disabled = false;
+      render();
+      checkEnd();
+    } else if (pegs[i] && legalTargets(i).length){
+      selected = i; render();
+    } else {
+      selected = null; render();
+      setStatus('Not a legal jump. Select a tee, then a highlighted hole.');
+    }
+  }
+
+  function checkEnd(){
+    if (anyMoves()){
+      var n = pegCount();
+      setStatus('<b>'+n+'</b> tee'+(n===1?'':'s')+' on the board. Keep jumping.');
+      return;
+    }
+    phase = 'over';
+    var left = pegCount();
+    var title, tail;
+    if (left===1){ title='You&rsquo;re a genius!'; tail='peg left &mdash; perfect game.'; }
+    else if (left===2){ title='Pretty smart'; tail='pegs left.'; }
+    else if (left===3){ title='Just plain dumb'; tail='pegs left.'; }
+    else { title='Eg-no-ra-moose'; tail='pegs left. Ouch.'; }
+    document.getElementById('endTitle').innerHTML = title;
+    document.getElementById('endCount').textContent = left;
+    document.getElementById('endMsg').innerHTML = tail;
+    overlay.classList.add('show');
+    setStatus('No jumps left &mdash; <b>'+left+'</b> remaining.');
+  }
+
+  function undo(){
+    if (!history.length) return;
+    pegs = history.pop();
+    phase = 'play';
+    selected = null;
+    overlay.classList.remove('show');
+    undoBtn.disabled = history.length===0;
+    setStatus('Move undone.');
+    render();
+  }
+
+  function resolveIdx(t){
+    while (t && t !== document.body){
+      if (t.getAttribute && t.getAttribute('data-idx') !== null){
+        return parseInt(t.getAttribute('data-idx'), 10);
+      }
+      t = t.parentNode;
+    }
+    return null;
+  }
+
+  // One physical tap can arrive via several event streams (pointerup,
+  // touchend, synthetic click). Dedupe: ignore a repeat of the same hole
+  // within 400ms.
+  var lastIdx = -1, lastT = 0;
+  function tap(i, e){
+    var now = Date.now();
+    if (i === lastIdx && now - lastT < 400) return;
+    lastIdx = i; lastT = now;
+    if (e && e.cancelable && e.preventDefault) e.preventDefault();
+    clickHole(i);
+  }
+
+  // listeners live on document (capture phase), not the svg, so they fire
+  // no matter how Safari routes events through the SVG subtree
+  document.addEventListener('click', function(e){
+    var i = resolveIdx(e.target);
+    if (i !== null) tap(i, e);
+  }, true);
+
+  if (window.PointerEvent){
+    document.addEventListener('pointerup', function(e){
+      if (e.pointerType === 'mouse') return; // mouse is handled by click
+      var i = resolveIdx(e.target);
+      if (i !== null) tap(i, e);
+    }, true);
+  }
+
+  var touchStartPt = null;
+  document.addEventListener('touchstart', function(e){
+    touchStartPt = (e.touches.length === 1)
+      ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+  }, {passive: true, capture: true});
+
+  document.addEventListener('touchend', function(e){
+    if (!touchStartPt) return;
+    var t = e.changedTouches[0];
+    var moved = Math.abs(t.clientX - touchStartPt.x) + Math.abs(t.clientY - touchStartPt.y);
+    touchStartPt = null;
+    if (moved > 12) return; // that was a scroll
+    var target = document.elementFromPoint(t.clientX, t.clientY);
+    var i = resolveIdx(target);
+    if (i !== null) tap(i, e);
+  }, {passive: false, capture: true});
+
+  undoBtn.addEventListener('click', undo);
+  document.getElementById('cheatBtn').addEventListener('click', function(){
+    cheat = !cheat;
+    this.textContent = 'Cheat: ' + (cheat ? 'on' : 'off');
+    render();
+  });
+  document.getElementById('resetBtn').addEventListener('click', init);
+  document.getElementById('againBtn').addEventListener('click', init);
+
+  init();
+})();
+</script>
+</body>
+</html>
